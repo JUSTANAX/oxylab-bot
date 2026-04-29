@@ -12,7 +12,8 @@ def stats_kb(is_admin: bool = False) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🔄 Обновить",      callback_data="refresh_stats")],
         [InlineKeyboardButton(text="👤 Профиль",        callback_data="profile"),
          InlineKeyboardButton(text="🔑 API-Ключи",      callback_data="api_keys")],
-        [InlineKeyboardButton(text="⚙️ Кастомизация",  callback_data="customize")],
+        [InlineKeyboardButton(text="⚙️ Кастомизация",  callback_data="customize"),
+         InlineKeyboardButton(text="📋 Обновления",    callback_data="changelog")],
     ]
     if is_admin:
         rows.append([InlineKeyboardButton(text="🛠 Админ", callback_data="admin_panel")])

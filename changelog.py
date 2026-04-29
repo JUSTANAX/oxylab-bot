@@ -1,0 +1,38 @@
+CHANGELOG = [
+    {
+        "version": "1.2",
+        "date": "29.04.2026",
+        "changes": [
+            "Кнопка «Обновления» с историей версий (макс. 10)",
+        ],
+    },
+    {
+        "version": "1.1",
+        "date": "29.04.2026",
+        "changes": [
+            "Параллельные API-запросы — загрузка стала быстрее",
+            "Индикатор загрузки при обновлении статистики",
+        ],
+    },
+    {
+        "version": "1.0",
+        "date": "29.04.2026",
+        "changes": [
+            "Запуск бота OxyLab",
+            "Интеграция с FarmSync и AccountsOps",
+            "Кастомизация отображаемой статистики",
+            "Отслеживание петов с историей фарма",
+            "API-ключи, профиль, админ-панель",
+        ],
+    },
+]
+
+
+def build_changelog_text() -> str:
+    lines = ["📋 <b>Обновления</b>\n"]
+    for entry in CHANGELOG[:10]:
+        lines.append(f"🔖 <b>v{entry['version']}</b> — {entry['date']}")
+        for change in entry["changes"]:
+            lines.append(f"  • {change}")
+        lines.append("")
+    return "\n".join(lines).rstrip()

@@ -691,6 +691,18 @@ async def set_key(callback: CallbackQuery, state: FSMContext):
     )
     await callback.answer()
 
+# ─── Обновления ───────────────────────────────────────────────────────────────
+
+@router.callback_query(lambda c: c.data == "changelog")
+async def show_changelog(callback: CallbackQuery):
+    from changelog import build_changelog_text
+    await callback.message.edit_text(
+        build_changelog_text(),
+        parse_mode="HTML",
+        reply_markup=back_kb()
+    )
+    await callback.answer()
+
 # ─── Валидация ────────────────────────────────────────────────────────────────
 
 async def validate_key(panel_type: str, api_key: str) -> tuple[bool, str]:
