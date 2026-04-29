@@ -7,15 +7,16 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.exceptions import TelegramBadRequest
 from keyboards import panel_choice_kb, stats_kb, settings_menu_kb, api_keys_kb, cancel_kb, back_kb, customize_kb, farmsync_customize_kb, accounts_customize_kb, pets_customize_kb, pets_stats_customize_kb, fs_resources_customize_kb, fs_pet_accounts_kb, ao_customize_kb, ao_accounts_customize_kb, ao_resources_customize_kb, ao_pets_customize_kb, ao_pets_stats_customize_kb, PET_STAT_PERIODS, AO_PET_STAT_PERIODS, AO_STAT_ITEMS, AO_RESOURCE_ITEMS, FS_RESOURCE_ITEMS
 from database import get_user, get_user_profile, get_panel, save_panel, save_user, update_user_info, get_setting, toggle_setting, save_setting, setting_exists, get_tracked_pets, save_pet_snapshot, get_pets_farmed_detail, get_tracked_ao_pets, save_ao_pet_snapshot, get_ao_pets_farmed_detail, get_tracked_fs_accounts
-from api.farmsync import get_stats as fs_get_stats, get_accounts as fs_get_accounts, _account_name
+from api.farmsync import get_stats as fs_get_stats
 from api.accountsops import get_dashboard, get_trackstats, get_all_pets, pet_kind_to_name
 
 router = Router()
 
 class SetKey(StatesGroup):
-    waiting_key  = State()
-    waiting_pet  = State()
-    waiting_ao_pet = State()
+    waiting_key       = State()
+    waiting_pet       = State()
+    waiting_ao_pet    = State()
+    waiting_fs_account = State()
 
 # ─── /start ───────────────────────────────────────────────────────────────────
 
@@ -498,66 +499,51 @@ async def open_customize_fs_accounts(callback: CallbackQuery):
     await callback.answer()
 
 @router.callback_query(lambda c: c.data == "fs_accounts_add")
-async def fs_accounts_add(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    fs_panel = get_panel(user_id, "farmsync")
-    if not fs_panel:
-        await callback.answer("FarmSync не подключён", show_alert=True)
-        return
-
-    await callback.message.edit_text("🔄 Загружаю список аккаунтов...")
-    ok, accounts, err = await fs_get_accounts(fs_panel[0])
-
-    if not ok:
-        await callback.message.edit_text(f"❌ {err}", reply_markup=back_kb())
-        return
-
-    names = list(dict.fromkeys(n for a in accounts if (n := _account_name(a))))
-
-    if not names:
-        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-        await callback.message.edit_text(
-            "❌ API не вернул имена аккаунтов.\n\nОбратись к разработчику.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔙 Назад", callback_data="customize:fs_accounts")]
-            ])
-        )
-        return
-
-    tracked = get_tracked_fs_accounts(user_id)
-    tracked_names = {n for n, _ in tracked}
-
+async def fs_accounts_add(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(SetKey.waiting_fs_account)
+    await state.update_data(fs_acc_chat_id=callback.message.chat.id, fs_acc_msg_id=callback.message.message_id)
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    rows = []
-    for name in names:
-        label = f"✓  {name}" if name in tracked_names else name
-        rows.append([InlineKeyboardButton(text=label, callback_data=f"fs_account_pick:{name}")])
-    rows.append([InlineKeyboardButton(text="🔙 Назад", callback_data="customize:fs_accounts")])
-
     await callback.message.edit_text(
-        "🎯 <b>Добавить аккаунт</b>\n\nВыбери аккаунты для фильтра петов:",
+        "🎯 <b>Добавить аккаунт</b>\n\n"
+        "Введи никнейм аккаунта точно как на панели FarmSync.\n\n"
+        "<i>⚠️ Аккаунт должен был запуститься хотя бы один раз на панели.</i>",
         parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=rows)
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="customize:fs_accounts")]
+        ])
     )
+    await callback.answer()
 
-@router.callback_query(lambda c: c.data.startswith("fs_account_pick:"))
-async def fs_account_pick(callback: CallbackQuery):
-    account_name = callback.data[len("fs_account_pick:"):]
-    user_id = callback.from_user.id
+@router.message(SetKey.waiting_fs_account)
+async def fs_account_receive(message: Message, state: FSMContext):
+    account_name = message.text.strip()
+    await message.delete()
+    user_id = message.from_user.id
+    data = await state.get_data()
+    chat_id = data.get("fs_acc_chat_id")
+    msg_id  = data.get("fs_acc_msg_id")
+
     key = f"fs_account:{account_name}"
     already = setting_exists(user_id, key)
     save_setting(user_id, key, True)
+    await state.clear()
+
     tracked = get_tracked_fs_accounts(user_id)
-    note = "ℹ️ уже был в фильтре" if already else f"✅ <b>{account_name}</b> добавлен"
-    await callback.message.edit_text(
+    note = "ℹ️ Уже был в фильтре" if already else f"✅ <b>{account_name}</b> добавлен"
+    text = (
         f"{note}\n\n"
         "🎯 <b>Фильтр петов</b>\n\n"
         "✅ — аккаунт включён в подсчёт петов.\n"
-        "❌ — исключён. Если все выключены — считаются все:",
-        parse_mode="HTML",
-        reply_markup=fs_pet_accounts_kb(tracked)
+        "❌ — исключён. Если все выключены — считаются все:"
     )
-    await callback.answer()
+    try:
+        await message.bot.edit_message_text(
+            chat_id=chat_id, message_id=msg_id,
+            text=text, parse_mode="HTML",
+            reply_markup=fs_pet_accounts_kb(tracked)
+        )
+    except Exception:
+        await message.answer(text, parse_mode="HTML", reply_markup=fs_pet_accounts_kb(tracked))
 
 @router.callback_query(lambda c: c.data.startswith("toggle:fs_account:"))
 async def handle_fs_account_toggle(callback: CallbackQuery):
