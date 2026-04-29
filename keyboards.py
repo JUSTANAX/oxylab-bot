@@ -14,6 +14,7 @@ def stats_kb(is_admin: bool = False) -> InlineKeyboardMarkup:
          InlineKeyboardButton(text="🔑 API-Ключи",      callback_data="api_keys")],
         [InlineKeyboardButton(text="⚙️ Кастомизация",  callback_data="customize"),
          InlineKeyboardButton(text="📋 Обновления",    callback_data="changelog")],
+        [InlineKeyboardButton(text="🔔 Уведомления",   callback_data="alerts")],
     ]
     if is_admin:
         rows.append([InlineKeyboardButton(text="🛠 Админ", callback_data="admin_panel")])
@@ -198,4 +199,38 @@ def cancel_kb() -> InlineKeyboardMarkup:
 def back_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🔙 Назад", callback_data="back_stats")]
+    ])
+
+def alerts_kb(mode: str, thresholds: dict) -> InlineKeyboardMarkup:
+    rows = []
+    if mode in ("farmsync", "both"):
+        t = thresholds.get("farmsync")
+        if t and t["threshold"]:
+            label = f"🌾 FarmSync: < {t['threshold']}"
+            icon = "✅" if t["enabled"] else "❌"
+        else:
+            label = "🌾 FarmSync: — задать порог"
+            icon = "❌"
+        rows.append([
+            InlineKeyboardButton(text=label,  callback_data="alert_set:farmsync"),
+            InlineKeyboardButton(text=icon,   callback_data="alert_toggle:farmsync"),
+        ])
+    if mode in ("accountsops", "both"):
+        t = thresholds.get("accountsops")
+        if t and t["threshold"]:
+            label = f"👤 AccountsOps: < {t['threshold']}"
+            icon = "✅" if t["enabled"] else "❌"
+        else:
+            label = "👤 AccountsOps: — задать порог"
+            icon = "❌"
+        rows.append([
+            InlineKeyboardButton(text=label,  callback_data="alert_set:accountsops"),
+            InlineKeyboardButton(text=icon,   callback_data="alert_toggle:accountsops"),
+        ])
+    rows.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back_stats")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+def alert_input_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="alerts")]
     ])

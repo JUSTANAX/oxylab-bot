@@ -47,6 +47,15 @@ def init_db():
                 PRIMARY KEY (user_id, type),
                 FOREIGN KEY (user_id) REFERENCES users(user_id)
             );
+
+            CREATE TABLE IF NOT EXISTS alert_thresholds (
+                user_id       INTEGER,
+                panel         TEXT,
+                threshold     INTEGER,
+                enabled       INTEGER DEFAULT 1,
+                last_notified TEXT,
+                PRIMARY KEY (user_id, panel)
+            );
         """)
         for col in ("username TEXT", "full_name TEXT", "subscription TEXT DEFAULT 'Test'"):
             try:
@@ -244,4 +253,39 @@ def delete_panel(user_id: int, panel_type: str):
         conn.execute(
             "DELETE FROM panels WHERE user_id = ? AND type = ?",
             (user_id, panel_type)
+        )
+
+def get_alert_threshold(user_id: int, panel: str):
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT threshold, enabled, last_notified FROM alert_thresholds WHERE user_id = ? AND panel = ?",
+            (user_id, panel)
+        ).fetchone()
+
+def set_alert_threshold(user_id: int, panel: str, threshold: int):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO alert_thresholds (user_id, panel, threshold, enabled) VALUES (?, ?, ?, 1) "
+            "ON CONFLICT(user_id, panel) DO UPDATE SET threshold = excluded.threshold, enabled = 1",
+            (user_id, panel, threshold)
+        )
+
+def toggle_alert(user_id: int, panel: str):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE alert_thresholds SET enabled = 1 - enabled WHERE user_id = ? AND panel = ?",
+            (user_id, panel)
+        )
+
+def get_users_with_alerts() -> list:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT user_id, panel, threshold, last_notified FROM alert_thresholds WHERE enabled = 1 AND threshold IS NOT NULL"
+        ).fetchall()
+
+def update_alert_notified(user_id: int, panel: str):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE alert_thresholds SET last_notified = ? WHERE user_id = ? AND panel = ?",
+            (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), user_id, panel)
         )
