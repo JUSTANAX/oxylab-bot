@@ -1,4 +1,5 @@
 import json
+import asyncio
 import aiohttp
 from config import FARMSYNC_URL
 
@@ -33,13 +34,14 @@ async def get_accounts(api_key: str) -> tuple[bool, list, str]:
 
 async def get_stats(api_key: str) -> tuple[bool, dict, str]:
     """Получаем всё за один раз для главного экрана."""
-    ok_d, devices, err = await get_devices(api_key)
+    (ok_d, devices, err_d), (ok_a, accounts, err_a) = await asyncio.gather(
+        get_devices(api_key),
+        get_accounts(api_key),
+    )
     if not ok_d:
-        return False, {}, err
-
-    ok_a, accounts, err = await get_accounts(api_key)
+        return False, {}, err_d
     if not ok_a:
-        return False, {}, err
+        return False, {}, err_a
 
     active   = sum(1 for a in accounts if a.get("running") and a.get("enabled"))
     inactive = sum(1 for a in accounts if not a.get("running") and a.get("enabled"))

@@ -1,3 +1,4 @@
+import asyncio
 from aiogram import Router
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
@@ -99,7 +100,6 @@ async def receive_key(message: Message, state: FSMContext):
 async def build_stats_text(user_id: int) -> str:
     user = get_user(user_id)
     mode = user[0]
-    lines = ["📊 <b>OxyLab</b>"]
 
     fs_panel = get_panel(user_id, "farmsync")
     ao_panel = get_panel(user_id, "accountsops")
@@ -108,12 +108,35 @@ async def build_stats_text(user_id: int) -> str:
     show_inactive = get_setting(user_id, "accounts_inactive")
     show_disabled = get_setting(user_id, "accounts_disabled")
     show_devices  = get_setting(user_id, "devices")
+    show_ao_bucks   = get_setting(user_id, "ao_bucks")
+    show_ao_potions = get_setting(user_id, "ao_potions")
+    ao_tracked_raw = get_tracked_ao_pets(user_id)
+    ao_enabled = [(k, pet_kind_to_name(k)) for k, enabled in ao_tracked_raw if enabled]
+
+    need_fs       = mode in ("farmsync", "both")    and get_setting(user_id, "panel_farmsync")    and bool(fs_panel)
+    need_ao       = mode in ("accountsops", "both") and get_setting(user_id, "panel_accountsops") and bool(ao_panel)
+    need_ao_track = need_ao and (show_ao_bucks or show_ao_potions)
+    need_ao_pets  = need_ao and bool(ao_enabled)
+
+    async def noop():
+        return None
+
+    fs_res, ao_dash_res, ao_track_res, ao_pets_res = await asyncio.gather(
+        fs_get_stats(fs_panel[0]) if need_fs else noop(),
+        get_dashboard(ao_panel[0]) if need_ao else noop(),
+        get_trackstats(ao_panel[0]) if need_ao_track else noop(),
+        get_all_pets(ao_panel[0]) if need_ao_pets else noop(),
+    )
+
+    lines = ["📊 <b>OxyLab</b>"]
 
     # ── FarmSync ──
     if mode in ("farmsync", "both") and get_setting(user_id, "panel_farmsync"):
         lines.append("")
-        if fs_panel:
-            ok, stats, err = await fs_get_stats(fs_panel[0])
+        if not fs_panel:
+            lines.append("🌾 <b>FarmSync</b> — не подключён")
+        else:
+            ok, stats, err = fs_res
             if ok:
                 def fmt(n): return f"{n:,}".replace(",", " ")
 
@@ -152,7 +175,6 @@ async def build_stats_text(user_id: int) -> str:
                 ]
                 active_periods = [(h, l) for k, h, l in period_map if get_setting(user_id, k)]
 
-                # Предзагружаем дельты для всех активных периодов
                 period_diffs = {}
                 if active_periods and all_pets:
                     for hours, label in active_periods:
@@ -184,16 +206,16 @@ async def build_stats_text(user_id: int) -> str:
                                 lines.append("    " + "  ·  ".join(stat_parts))
             else:
                 lines.append(f"🌾 <b>FarmSync</b> — ❌ {err}")
-        else:
-            lines.append("🌾 <b>FarmSync</b> — не подключён")
 
     # ── AccountsOps ──
     if mode in ("accountsops", "both") and get_setting(user_id, "panel_accountsops"):
         lines.append("")
         lines.append("<code>──────────────────</code>")
         lines.append("")
-        if ao_panel:
-            ok, data, err = await get_dashboard(ao_panel[0])
+        if not ao_panel:
+            lines.append("👤 <b>AccountsOps</b> — не подключён")
+        else:
+            ok, data, err = ao_dash_res
             if ok:
                 lines.append("👤 <b>AccountsOps</b>")
                 ao_parts = []
@@ -206,10 +228,8 @@ async def build_stats_text(user_id: int) -> str:
                     lines.append("")
                     lines.append("  👥 " + "   ".join(ao_parts))
 
-                show_ao_bucks   = get_setting(user_id, "ao_bucks")
-                show_ao_potions = get_setting(user_id, "ao_potions")
-                if show_ao_bucks or show_ao_potions:
-                    ok2, totals, _ = await get_trackstats(ao_panel[0])
+                if ao_track_res is not None:
+                    ok2, totals, _ = ao_track_res
                     if ok2:
                         def fmt(n): return f"{n:,}".replace(",", " ")
                         res = []
@@ -219,10 +239,8 @@ async def build_stats_text(user_id: int) -> str:
                             lines.append("")
                             lines.append("  " + "   ".join(res))
 
-                ao_tracked_raw = get_tracked_ao_pets(user_id)
-                ao_enabled = [(k, pet_kind_to_name(k)) for k, enabled in ao_tracked_raw if enabled]
-                if ao_enabled:
-                    ok3, all_ao_pets, _ = await get_all_pets(ao_panel[0])
+                if ao_pets_res is not None and ao_enabled:
+                    ok3, all_ao_pets, _ = ao_pets_res
                     if ok3 and all_ao_pets:
                         save_ao_pet_snapshot(user_id, all_ao_pets)
 
@@ -258,20 +276,24 @@ async def build_stats_text(user_id: int) -> str:
                                     lines.append("    " + "  ·  ".join(stat_parts))
             else:
                 lines.append(f"👤 <b>AccountsOps</b> — ❌ {err}")
-        else:
-            lines.append("👤 <b>AccountsOps</b> — не подключён")
 
     return "\n".join(lines)
 
 async def show_stats(message_or_obj, user_id: int, edit: bool = False):
     from config import ADMIN_ID
-    text = await build_stats_text(user_id)
     kb = stats_kb(is_admin=(user_id == ADMIN_ID))
     try:
         if edit and hasattr(message_or_obj, 'edit_text'):
+            try:
+                await message_or_obj.edit_text("🔄 Загружаю...")
+            except TelegramBadRequest:
+                pass
+            text = await build_stats_text(user_id)
             await message_or_obj.edit_text(text, parse_mode="HTML", reply_markup=kb)
         else:
-            await message_or_obj.answer(text, parse_mode="HTML", reply_markup=kb)
+            msg = await message_or_obj.answer("🔄 Загружаю...")
+            text = await build_stats_text(user_id)
+            await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
     except TelegramBadRequest as e:
         if "message is not modified" in str(e):
             pass
