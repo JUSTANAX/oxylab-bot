@@ -65,12 +65,25 @@ def farmsync_customize_kb(settings: dict) -> InlineKeyboardMarkup:
         return InlineKeyboardButton(text=f"{icon}  {label}", callback_data=f"toggle:{key}")
 
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👥 Аккаунты  ›",  callback_data="customize:accounts")],
+        [InlineKeyboardButton(text="👥 Аккаунты  ›",      callback_data="customize:accounts")],
         [btn("devices", "🖥 Девайсы")],
-        [InlineKeyboardButton(text="🐾 Петы  ›",      callback_data="customize:pets")],
-        [InlineKeyboardButton(text="💰 Ресурсы  ›",   callback_data="customize:fs_resources")],
-        [InlineKeyboardButton(text="🔙 Назад",         callback_data="customize")],
+        [InlineKeyboardButton(text="🐾 Петы  ›",           callback_data="customize:pets")],
+        [InlineKeyboardButton(text="🎯 Фильтр петов  ›",   callback_data="customize:fs_accounts")],
+        [InlineKeyboardButton(text="💰 Ресурсы  ›",        callback_data="customize:fs_resources")],
+        [InlineKeyboardButton(text="🔙 Назад",              callback_data="customize")],
     ])
+
+def fs_pet_accounts_kb(tracked: list) -> InlineKeyboardMarkup:
+    rows = []
+    for username, enabled in tracked:
+        icon = "✅" if enabled else "❌"
+        rows.append([InlineKeyboardButton(
+            text=f"{icon}  {username}",
+            callback_data=f"toggle:fs_account:{username}"
+        )])
+    rows.append([InlineKeyboardButton(text="➕ Добавить аккаунт", callback_data="fs_accounts_add")])
+    rows.append([InlineKeyboardButton(text="🔙 Назад", callback_data="customize:farmsync")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 def fs_resources_customize_kb(settings: dict) -> InlineKeyboardMarkup:
     rows = []

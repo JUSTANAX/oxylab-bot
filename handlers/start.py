@@ -5,9 +5,9 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.exceptions import TelegramBadRequest
-from keyboards import panel_choice_kb, stats_kb, settings_menu_kb, api_keys_kb, cancel_kb, back_kb, customize_kb, farmsync_customize_kb, accounts_customize_kb, pets_customize_kb, pets_stats_customize_kb, fs_resources_customize_kb, ao_customize_kb, ao_accounts_customize_kb, ao_resources_customize_kb, ao_pets_customize_kb, ao_pets_stats_customize_kb, PET_STAT_PERIODS, AO_PET_STAT_PERIODS, AO_STAT_ITEMS, AO_RESOURCE_ITEMS, FS_RESOURCE_ITEMS
-from database import get_user, get_user_profile, get_panel, save_panel, save_user, update_user_info, get_setting, toggle_setting, save_setting, setting_exists, get_tracked_pets, save_pet_snapshot, get_pets_farmed_detail, get_tracked_ao_pets, save_ao_pet_snapshot, get_ao_pets_farmed_detail
-from api.farmsync import get_stats as fs_get_stats
+from keyboards import panel_choice_kb, stats_kb, settings_menu_kb, api_keys_kb, cancel_kb, back_kb, customize_kb, farmsync_customize_kb, accounts_customize_kb, pets_customize_kb, pets_stats_customize_kb, fs_resources_customize_kb, fs_pet_accounts_kb, ao_customize_kb, ao_accounts_customize_kb, ao_resources_customize_kb, ao_pets_customize_kb, ao_pets_stats_customize_kb, PET_STAT_PERIODS, AO_PET_STAT_PERIODS, AO_STAT_ITEMS, AO_RESOURCE_ITEMS, FS_RESOURCE_ITEMS
+from database import get_user, get_user_profile, get_panel, save_panel, save_user, update_user_info, get_setting, toggle_setting, save_setting, setting_exists, get_tracked_pets, save_pet_snapshot, get_pets_farmed_detail, get_tracked_ao_pets, save_ao_pet_snapshot, get_ao_pets_farmed_detail, get_tracked_fs_accounts
+from api.farmsync import get_stats as fs_get_stats, get_accounts as fs_get_accounts, _account_name
 from api.accountsops import get_dashboard, get_trackstats, get_all_pets, pet_kind_to_name
 
 router = Router()
@@ -118,11 +118,18 @@ async def build_stats_text(user_id: int) -> str:
     need_ao_track = need_ao and (show_ao_bucks or show_ao_potions)
     need_ao_pets  = need_ao and bool(ao_enabled)
 
+    pet_filter = None
+    if need_fs:
+        tracked_accs = get_tracked_fs_accounts(user_id)
+        enabled_accs = [n for n, en in tracked_accs if en]
+        if enabled_accs:
+            pet_filter = enabled_accs
+
     async def noop():
         return None
 
     fs_res, ao_dash_res, ao_track_res, ao_pets_res = await asyncio.gather(
-        fs_get_stats(fs_panel[0]) if need_fs else noop(),
+        fs_get_stats(fs_panel[0], pet_accounts=pet_filter) if need_fs else noop(),
         get_dashboard(ao_panel[0]) if need_ao else noop(),
         get_trackstats(ao_panel[0]) if need_ao_track else noop(),
         get_all_pets(ao_panel[0]) if need_ao_pets else noop(),
@@ -425,7 +432,7 @@ async def open_customize_pets(callback: CallbackQuery):
     await callback.answer()
 
 # Тоглы обычных настроек (accounts_*, devices)
-@router.callback_query(lambda c: c.data.startswith("toggle:") and not c.data.startswith("toggle:pet:"))
+@router.callback_query(lambda c: c.data.startswith("toggle:") and not c.data.startswith("toggle:pet:") and not c.data.startswith("toggle:ao_pet:") and not c.data.startswith("toggle:fs_account:"))
 async def handle_toggle(callback: CallbackQuery):
     key = callback.data[len("toggle:"):]
     if key not in SETTING_KEYS:
@@ -469,6 +476,95 @@ async def handle_ao_pet_toggle(callback: CallbackQuery):
     raw = get_tracked_ao_pets(callback.from_user.id)
     tracked = [(k, pet_kind_to_name(k), enabled) for k, enabled in raw]
     await callback.message.edit_reply_markup(reply_markup=ao_pets_customize_kb(tracked))
+    await callback.answer()
+
+# ─── Фильтр петов по аккаунту ─────────────────────────────────────────────────
+
+@router.callback_query(lambda c: c.data == "customize:fs_accounts")
+async def open_customize_fs_accounts(callback: CallbackQuery):
+    tracked = get_tracked_fs_accounts(callback.from_user.id)
+    tip = (
+        "Список пуст — петы считаются со <b>всех аккаунтов</b>.\n"
+        "Добавь аккаунты чтобы считать только с них:"
+        if not tracked else
+        "✅ — аккаунт включён в подсчёт петов.\n"
+        "❌ — исключён. Если все выключены — считаются все:"
+    )
+    await callback.message.edit_text(
+        f"🎯 <b>Фильтр петов</b>\n\n{tip}",
+        parse_mode="HTML",
+        reply_markup=fs_pet_accounts_kb(tracked)
+    )
+    await callback.answer()
+
+@router.callback_query(lambda c: c.data == "fs_accounts_add")
+async def fs_accounts_add(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    fs_panel = get_panel(user_id, "farmsync")
+    if not fs_panel:
+        await callback.answer("FarmSync не подключён", show_alert=True)
+        return
+
+    await callback.message.edit_text("🔄 Загружаю список аккаунтов...")
+    ok, accounts, err = await fs_get_accounts(fs_panel[0])
+
+    if not ok:
+        await callback.message.edit_text(f"❌ {err}", reply_markup=back_kb())
+        return
+
+    names = list(dict.fromkeys(n for a in accounts if (n := _account_name(a))))
+
+    if not names:
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        await callback.message.edit_text(
+            "❌ API не вернул имена аккаунтов.\n\nОбратись к разработчику.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔙 Назад", callback_data="customize:fs_accounts")]
+            ])
+        )
+        return
+
+    tracked = get_tracked_fs_accounts(user_id)
+    tracked_names = {n for n, _ in tracked}
+
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    rows = []
+    for name in names:
+        label = f"✓  {name}" if name in tracked_names else name
+        rows.append([InlineKeyboardButton(text=label, callback_data=f"fs_account_pick:{name}")])
+    rows.append([InlineKeyboardButton(text="🔙 Назад", callback_data="customize:fs_accounts")])
+
+    await callback.message.edit_text(
+        "🎯 <b>Добавить аккаунт</b>\n\nВыбери аккаунты для фильтра петов:",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=rows)
+    )
+
+@router.callback_query(lambda c: c.data.startswith("fs_account_pick:"))
+async def fs_account_pick(callback: CallbackQuery):
+    account_name = callback.data[len("fs_account_pick:"):]
+    user_id = callback.from_user.id
+    key = f"fs_account:{account_name}"
+    already = setting_exists(user_id, key)
+    save_setting(user_id, key, True)
+    tracked = get_tracked_fs_accounts(user_id)
+    note = "ℹ️ уже был в фильтре" if already else f"✅ <b>{account_name}</b> добавлен"
+    await callback.message.edit_text(
+        f"{note}\n\n"
+        "🎯 <b>Фильтр петов</b>\n\n"
+        "✅ — аккаунт включён в подсчёт петов.\n"
+        "❌ — исключён. Если все выключены — считаются все:",
+        parse_mode="HTML",
+        reply_markup=fs_pet_accounts_kb(tracked)
+    )
+    await callback.answer()
+
+@router.callback_query(lambda c: c.data.startswith("toggle:fs_account:"))
+async def handle_fs_account_toggle(callback: CallbackQuery):
+    key = callback.data[len("toggle:"):]   # "fs_account:NAME"
+    toggle_setting(callback.from_user.id, key)
+    tracked = get_tracked_fs_accounts(callback.from_user.id)
+    await callback.message.edit_reply_markup(reply_markup=fs_pet_accounts_kb(tracked))
     await callback.answer()
 
 # ─── Добавление пета ──────────────────────────────────────────────────────────

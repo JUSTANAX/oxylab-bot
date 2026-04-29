@@ -32,8 +32,16 @@ async def get_accounts(api_key: str) -> tuple[bool, list, str]:
     ok, data, err = await _get(api_key, "/api/self/accounts")
     return ok, data or [], err
 
-async def get_stats(api_key: str) -> tuple[bool, dict, str]:
-    """Получаем всё за один раз для главного экрана."""
+def _account_name(account: dict) -> str:
+    for field in ("username", "name", "player_name", "login", "roblox_username", "account_name"):
+        val = account.get(field)
+        if val:
+            return str(val)
+    return ""
+
+async def get_stats(api_key: str, pet_accounts: list | None = None) -> tuple[bool, dict, str]:
+    """Получаем всё за один раз для главного экрана.
+    pet_accounts: список ников для фильтра петов. None = все аккаунты."""
     (ok_d, devices, err_d), (ok_a, accounts, err_a) = await asyncio.gather(
         get_devices(api_key),
         get_accounts(api_key),
@@ -67,17 +75,18 @@ async def get_stats(api_key: str) -> tuple[bool, dict, str]:
             potions      += data.get("potions", 0)
             ride_potions += data.get("ride_potions", 0)
             fly_potions  += data.get("fly_potions", 0)
-            for pet in data.get("pets", []):
-                name = pet.get("name")
-                if not name:
-                    continue
-                if name not in pets:
-                    pets[name] = {
-                        "amount": 0,
-                        "rarity": pet.get("rarity", "Common"),
-                        "is_egg": pet.get("is_egg", False),
-                    }
-                pets[name]["amount"] += pet.get("amount", 1)
+            if pet_accounts is None or _account_name(account) in pet_accounts:
+                for pet in data.get("pets", []):
+                    name = pet.get("name")
+                    if not name:
+                        continue
+                    if name not in pets:
+                        pets[name] = {
+                            "amount": 0,
+                            "rarity": pet.get("rarity", "Common"),
+                            "is_egg": pet.get("is_egg", False),
+                        }
+                    pets[name]["amount"] += pet.get("amount", 1)
         except Exception:
             continue
 
