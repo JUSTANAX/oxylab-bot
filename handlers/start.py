@@ -5,7 +5,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.exceptions import TelegramBadRequest
-from keyboards import panel_choice_kb, stats_kb, api_keys_kb, cancel_kb, back_kb, customize_kb, farmsync_customize_kb, accounts_customize_kb, pets_customize_kb, pets_stats_customize_kb, fs_resources_customize_kb, ao_customize_kb, ao_accounts_customize_kb, ao_resources_customize_kb, ao_pets_customize_kb, ao_pets_stats_customize_kb, PET_STAT_PERIODS, AO_PET_STAT_PERIODS, AO_STAT_ITEMS, AO_RESOURCE_ITEMS, FS_RESOURCE_ITEMS
+from keyboards import panel_choice_kb, stats_kb, settings_menu_kb, api_keys_kb, cancel_kb, back_kb, customize_kb, farmsync_customize_kb, accounts_customize_kb, pets_customize_kb, pets_stats_customize_kb, fs_resources_customize_kb, ao_customize_kb, ao_accounts_customize_kb, ao_resources_customize_kb, ao_pets_customize_kb, ao_pets_stats_customize_kb, PET_STAT_PERIODS, AO_PET_STAT_PERIODS, AO_STAT_ITEMS, AO_RESOURCE_ITEMS, FS_RESOURCE_ITEMS
 from database import get_user, get_user_profile, get_panel, save_panel, save_user, update_user_info, get_setting, toggle_setting, save_setting, setting_exists, get_tracked_pets, save_pet_snapshot, get_pets_farmed_detail, get_tracked_ao_pets, save_ao_pet_snapshot, get_ao_pets_farmed_detail
 from api.farmsync import get_stats as fs_get_stats
 from api.accountsops import get_dashboard, get_trackstats, get_all_pets, pet_kind_to_name
@@ -688,6 +688,17 @@ async def set_key(callback: CallbackQuery, state: FSMContext):
         f"🔑 Отправь новый API ключ для <b>{names[panel_type]}</b>:",
         parse_mode="HTML",
         reply_markup=cancel_kb()
+    )
+    await callback.answer()
+
+# ─── Настройки ────────────────────────────────────────────────────────────────
+
+@router.callback_query(lambda c: c.data == "settings_menu")
+async def open_settings_menu(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "🔧 <b>Настройки</b>",
+        parse_mode="HTML",
+        reply_markup=settings_menu_kb()
     )
     await callback.answer()
 

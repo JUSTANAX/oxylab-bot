@@ -9,16 +9,22 @@ def panel_choice_kb() -> InlineKeyboardMarkup:
 
 def stats_kb(is_admin: bool = False) -> InlineKeyboardMarkup:
     rows = [
-        [InlineKeyboardButton(text="🔄 Обновить",      callback_data="refresh_stats")],
-        [InlineKeyboardButton(text="👤 Профиль",        callback_data="profile"),
-         InlineKeyboardButton(text="🔑 API-Ключи",      callback_data="api_keys")],
-        [InlineKeyboardButton(text="⚙️ Кастомизация",  callback_data="customize"),
-         InlineKeyboardButton(text="📋 Обновления",    callback_data="changelog")],
-        [InlineKeyboardButton(text="🔔 Уведомления",   callback_data="alerts")],
+        [InlineKeyboardButton(text="🔄 Обновить",     callback_data="refresh_stats")],
+        [InlineKeyboardButton(text="👤 Профиль",       callback_data="profile"),
+         InlineKeyboardButton(text="⚙️ Кастомизация", callback_data="customize")],
+        [InlineKeyboardButton(text="🔧 Настройки",    callback_data="settings_menu")],
     ]
     if is_admin:
         rows.append([InlineKeyboardButton(text="🛠 Админ", callback_data="admin_panel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+def settings_menu_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔑 API-Ключи",    callback_data="api_keys")],
+        [InlineKeyboardButton(text="🔔 Уведомления",  callback_data="alerts")],
+        [InlineKeyboardButton(text="📋 Обновления",   callback_data="changelog")],
+        [InlineKeyboardButton(text="🔙 Назад",         callback_data="back_stats")],
+    ])
 
 FS_RESOURCE_ITEMS = [
     ("fs_bucks",   "💰 Баксы"),
@@ -188,7 +194,7 @@ def api_keys_kb(mode: str, has_fs: bool, has_ao: bool) -> InlineKeyboardMarkup:
         label = "👤 AccountsOps: ✅ Сменить ключ" if has_ao else "👤 AccountsOps: ❌ Подключить"
         buttons.append([InlineKeyboardButton(text=label, callback_data="set_key:accountsops")])
 
-    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back_stats")])
+    buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="settings_menu")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def cancel_kb() -> InlineKeyboardMarkup:
