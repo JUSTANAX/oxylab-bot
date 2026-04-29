@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.exceptions import TelegramBadRequest
 from keyboards import panel_choice_kb, stats_kb, settings_menu_kb, api_keys_kb, cancel_kb, back_kb, customize_kb, farmsync_customize_kb, accounts_customize_kb, pets_customize_kb, pets_stats_customize_kb, fs_resources_customize_kb, fs_pet_accounts_kb, ao_customize_kb, ao_accounts_customize_kb, ao_resources_customize_kb, ao_pets_customize_kb, ao_pets_stats_customize_kb, ao_pet_accounts_kb, PET_STAT_PERIODS, AO_PET_STAT_PERIODS, AO_STAT_ITEMS, AO_RESOURCE_ITEMS, FS_RESOURCE_ITEMS
-from database import get_user, get_user_profile, get_panel, save_panel, save_user, update_user_info, get_setting, toggle_setting, save_setting, setting_exists, get_tracked_pets, save_pet_snapshot, get_pets_farmed_detail, get_tracked_ao_pets, save_ao_pet_snapshot, get_ao_pets_farmed_detail, get_tracked_fs_accounts, get_tracked_ao_accounts
+from database import get_user, get_user_profile, get_panel, save_panel, save_user, update_user_info, get_setting, toggle_setting, save_setting, setting_exists, delete_setting, get_tracked_pets, save_pet_snapshot, get_pets_farmed_detail, get_tracked_ao_pets, save_ao_pet_snapshot, get_ao_pets_farmed_detail, get_tracked_fs_accounts, get_tracked_ao_accounts, save_fs_resource_snapshot, get_fs_resource_diff, save_ao_resource_snapshot, get_ao_resource_diff
 from api.farmsync import get_stats as fs_get_stats
 from api.accountsops import get_dashboard, get_trackstats, get_all_pets, pet_kind_to_name
 
@@ -171,17 +171,6 @@ async def build_stats_text(user_id: int) -> str:
                     for d in stats["devices"]:
                         lines.append(f"  🖥 {d['name']} — {d['active_accounts']}/{d['total_accounts']}")
 
-                res_parts = []
-                if get_setting(user_id, "fs_bucks"):   res_parts.append(f"💰 {fmt(stats.get('bucks', 0))}")
-                if get_setting(user_id, "fs_potions"): res_parts.append(f"🧪 {fmt(stats.get('potions', 0))}")
-                if res_parts:
-                    lines.append("")
-                    lines.append("  " + "   ".join(res_parts))
-
-                all_pets = stats.get("pets", {})
-                if all_pets:
-                    save_pet_snapshot(user_id, all_pets)
-
                 period_map = [
                     ("pets_stat_1h",   1,   "1ч"),
                     ("pets_stat_6h",   6,   "6ч"),
@@ -191,10 +180,38 @@ async def build_stats_text(user_id: int) -> str:
                 ]
                 active_periods = [(h, l) for k, h, l in period_map if get_setting(user_id, k)]
 
+                bucks_val   = stats.get("bucks", 0)
+                potions_val = stats.get("potions", 0)
+                all_pets    = stats.get("pets", {})
+
+                if all_pets:
+                    save_pet_snapshot(user_id, all_pets)
+                save_fs_resource_snapshot(user_id, bucks_val, potions_val)
+
+                res_diffs = {l: get_fs_resource_diff(user_id, bucks_val, potions_val, h)
+                             for h, l in active_periods}
+
                 period_diffs = {}
                 if active_periods and all_pets:
                     for hours, label in active_periods:
                         period_diffs[label] = get_pets_farmed_detail(user_id, all_pets, hours)
+
+                show_fs_bucks   = get_setting(user_id, "fs_bucks")
+                show_fs_potions = get_setting(user_id, "fs_potions")
+                if show_fs_bucks or show_fs_potions:
+                    lines.append("")
+                    for show, icon, val, didx in [
+                        (show_fs_bucks,   "💰", bucks_val,   0),
+                        (show_fs_potions, "🧪", potions_val, 1),
+                    ]:
+                        if not show:
+                            continue
+                        line = f"  {icon} {fmt(val)}"
+                        diff_parts = [f"{l}: +{fmt(d[didx])}" for _, l in active_periods
+                                      if (d := res_diffs.get(l)) and d[didx] is not None]
+                        if diff_parts:
+                            line += "   " + "  ·  ".join(diff_parts)
+                        lines.append(line)
 
                 tracked = get_tracked_pets(user_id)
                 if tracked:
@@ -244,30 +261,43 @@ async def build_stats_text(user_id: int) -> str:
                     lines.append("")
                     lines.append("  👥 " + "   ".join(ao_parts))
 
+                ao_period_map = [
+                    ("ao_pets_stat_1h",   1,   "1ч"),
+                    ("ao_pets_stat_6h",   6,   "6ч"),
+                    ("ao_pets_stat_12h",  12,  "12ч"),
+                    ("ao_pets_stat_24h",  24,  "24ч"),
+                    ("ao_pets_stat_168h", 168, "7д"),
+                ]
+                ao_active_periods = [(h, l) for k, h, l in ao_period_map if get_setting(user_id, k)]
+
                 if ao_track_res is not None:
                     ok2, totals, _ = ao_track_res
                     if ok2:
                         def fmt(n): return f"{n:,}".replace(",", " ")
-                        res = []
-                        if show_ao_bucks:   res.append(f"💰 {fmt(totals.get('total_bucks', 0))}")
-                        if show_ao_potions: res.append(f"🧪 {fmt(totals.get('total_potions', 0))}")
-                        if res:
+                        ao_bucks_val   = totals.get("total_bucks", 0)
+                        ao_potions_val = totals.get("total_potions", 0)
+                        save_ao_resource_snapshot(user_id, ao_bucks_val, ao_potions_val)
+                        ao_res_diffs = {l: get_ao_resource_diff(user_id, ao_bucks_val, ao_potions_val, h)
+                                        for h, l in ao_active_periods}
+                        if show_ao_bucks or show_ao_potions:
                             lines.append("")
-                            lines.append("  " + "   ".join(res))
+                            for show, icon, val, didx in [
+                                (show_ao_bucks,   "💰", ao_bucks_val,   0),
+                                (show_ao_potions, "🧪", ao_potions_val, 1),
+                            ]:
+                                if not show:
+                                    continue
+                                line = f"  {icon} {fmt(val)}"
+                                diff_parts = [f"{l}: +{fmt(d[didx])}" for _, l in ao_active_periods
+                                              if (d := ao_res_diffs.get(l)) and d[didx] is not None]
+                                if diff_parts:
+                                    line += "   " + "  ·  ".join(diff_parts)
+                                lines.append(line)
 
                 if ao_pets_res is not None and ao_enabled:
                     ok3, all_ao_pets, _ = ao_pets_res
                     if ok3 and all_ao_pets:
                         save_ao_pet_snapshot(user_id, all_ao_pets)
-
-                        ao_period_map = [
-                            ("ao_pets_stat_1h",   1,   "1ч"),
-                            ("ao_pets_stat_6h",   6,   "6ч"),
-                            ("ao_pets_stat_12h",  12,  "12ч"),
-                            ("ao_pets_stat_24h",  24,  "24ч"),
-                            ("ao_pets_stat_168h", 168, "7д"),
-                        ]
-                        ao_active_periods = [(h, l) for k, h, l in ao_period_map if get_setting(user_id, k)]
 
                         ao_period_diffs = {}
                         if ao_active_periods:
@@ -773,6 +803,41 @@ async def ao_pets_add_receive(message: Message, state: FSMContext):
         text = f"✅ <b>{display_name}</b>{egg} добавлен в отслеживание!\n×{pd['quantity']}"
 
     await msg.edit_text(text, parse_mode="HTML", reply_markup=back_to_pets)
+
+# ─── Удаление из фильтров ─────────────────────────────────────────────────────
+
+@router.callback_query(lambda c: c.data.startswith("del:pet:"))
+async def del_pet(callback: CallbackQuery):
+    name = callback.data[len("del:pet:"):]
+    delete_setting(callback.from_user.id, f"pet:{name}")
+    tracked = get_tracked_pets(callback.from_user.id)
+    await callback.message.edit_reply_markup(reply_markup=pets_customize_kb(tracked))
+    await callback.answer(f"Удалено: {name}")
+
+@router.callback_query(lambda c: c.data.startswith("del:ao_pet:"))
+async def del_ao_pet(callback: CallbackQuery):
+    kind = callback.data[len("del:ao_pet:"):]
+    delete_setting(callback.from_user.id, f"ao_pet:{kind}")
+    raw = get_tracked_ao_pets(callback.from_user.id)
+    tracked = [(k, pet_kind_to_name(k), en) for k, en in raw]
+    await callback.message.edit_reply_markup(reply_markup=ao_pets_customize_kb(tracked))
+    await callback.answer("Удалено")
+
+@router.callback_query(lambda c: c.data.startswith("del:fs_account:"))
+async def del_fs_account(callback: CallbackQuery):
+    name = callback.data[len("del:fs_account:"):]
+    delete_setting(callback.from_user.id, f"fs_account:{name}")
+    tracked = get_tracked_fs_accounts(callback.from_user.id)
+    await callback.message.edit_reply_markup(reply_markup=fs_pet_accounts_kb(tracked))
+    await callback.answer(f"Удалено: {name}")
+
+@router.callback_query(lambda c: c.data.startswith("del:ao_account:"))
+async def del_ao_account(callback: CallbackQuery):
+    name = callback.data[len("del:ao_account:"):]
+    delete_setting(callback.from_user.id, f"ao_account:{name}")
+    tracked = get_tracked_ao_accounts(callback.from_user.id)
+    await callback.message.edit_reply_markup(reply_markup=ao_pet_accounts_kb(tracked))
+    await callback.answer(f"Удалено: {name}")
 
 # ─── Профиль ──────────────────────────────────────────────────────────────────
 

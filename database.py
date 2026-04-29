@@ -48,6 +48,22 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(user_id)
             );
 
+            CREATE TABLE IF NOT EXISTS fs_resource_snapshots (
+                user_id     INTEGER,
+                bucks       INTEGER,
+                potions     INTEGER,
+                recorded_at TEXT,
+                PRIMARY KEY (user_id, recorded_at)
+            );
+
+            CREATE TABLE IF NOT EXISTS ao_resource_snapshots (
+                user_id     INTEGER,
+                bucks       INTEGER,
+                potions     INTEGER,
+                recorded_at TEXT,
+                PRIMARY KEY (user_id, recorded_at)
+            );
+
             CREATE TABLE IF NOT EXISTS alert_thresholds (
                 user_id       INTEGER,
                 panel         TEXT,
@@ -298,6 +314,59 @@ def get_users_with_alerts() -> list:
         return conn.execute(
             "SELECT user_id, panel, threshold, last_notified FROM alert_thresholds WHERE enabled = 1 AND threshold IS NOT NULL"
         ).fetchall()
+
+def delete_setting(user_id: int, key: str):
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM user_settings WHERE user_id = ? AND key = ?",
+            (user_id, key)
+        )
+
+def save_fs_resource_snapshot(user_id: int, bucks: int, potions: int):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:00")
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM fs_resource_snapshots WHERE user_id = ? AND recorded_at < ?",
+            (user_id, (datetime.utcnow() - timedelta(days=8)).strftime("%Y-%m-%d %H:%M:00"))
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO fs_resource_snapshots (user_id, bucks, potions, recorded_at) VALUES (?, ?, ?, ?)",
+            (user_id, bucks, potions, now)
+        )
+
+def get_fs_resource_diff(user_id: int, cur_bucks: int, cur_potions: int, hours: float) -> tuple:
+    target = (datetime.utcnow() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:00")
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT bucks, potions FROM fs_resource_snapshots WHERE user_id = ? AND recorded_at <= ? ORDER BY recorded_at DESC LIMIT 1",
+            (user_id, target)
+        ).fetchone()
+    if not row:
+        return None, None
+    return max(0, cur_bucks - row[0]), max(0, cur_potions - row[1])
+
+def save_ao_resource_snapshot(user_id: int, bucks: int, potions: int):
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:00")
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM ao_resource_snapshots WHERE user_id = ? AND recorded_at < ?",
+            (user_id, (datetime.utcnow() - timedelta(days=8)).strftime("%Y-%m-%d %H:%M:00"))
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO ao_resource_snapshots (user_id, bucks, potions, recorded_at) VALUES (?, ?, ?, ?)",
+            (user_id, bucks, potions, now)
+        )
+
+def get_ao_resource_diff(user_id: int, cur_bucks: int, cur_potions: int, hours: float) -> tuple:
+    target = (datetime.utcnow() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:00")
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT bucks, potions FROM ao_resource_snapshots WHERE user_id = ? AND recorded_at <= ? ORDER BY recorded_at DESC LIMIT 1",
+            (user_id, target)
+        ).fetchone()
+    if not row:
+        return None, None
+    return max(0, cur_bucks - row[0]), max(0, cur_potions - row[1])
 
 def update_alert_notified(user_id: int, panel: str):
     with get_conn() as conn:

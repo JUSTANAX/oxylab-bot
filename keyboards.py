@@ -77,10 +77,10 @@ def fs_pet_accounts_kb(tracked: list) -> InlineKeyboardMarkup:
     rows = []
     for username, enabled in tracked:
         icon = "✅" if enabled else "❌"
-        rows.append([InlineKeyboardButton(
-            text=f"{icon}  {username}",
-            callback_data=f"toggle:fs_account:{username}"
-        )])
+        rows.append([
+            InlineKeyboardButton(text=f"{icon}  {username}", callback_data=f"toggle:fs_account:{username}"),
+            InlineKeyboardButton(text="🗑", callback_data=f"del:fs_account:{username}"),
+        ])
     rows.append([InlineKeyboardButton(text="➕ Добавить аккаунт", callback_data="fs_accounts_add")])
     rows.append([InlineKeyboardButton(text="🔙 Назад", callback_data="customize:farmsync")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -106,10 +106,10 @@ def ao_pet_accounts_kb(tracked: list) -> InlineKeyboardMarkup:
     rows = []
     for username, enabled in tracked:
         icon = "✅" if enabled else "❌"
-        rows.append([InlineKeyboardButton(
-            text=f"{icon}  {username}",
-            callback_data=f"toggle:ao_account:{username}"
-        )])
+        rows.append([
+            InlineKeyboardButton(text=f"{icon}  {username}", callback_data=f"toggle:ao_account:{username}"),
+            InlineKeyboardButton(text="🗑", callback_data=f"del:ao_account:{username}"),
+        ])
     rows.append([InlineKeyboardButton(text="➕ Добавить аккаунт", callback_data="ao_accounts_add")])
     rows.append([InlineKeyboardButton(text="🔙 Назад", callback_data="customize:accountsops")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -118,10 +118,10 @@ def ao_pets_customize_kb(tracked: list) -> InlineKeyboardMarkup:
     rows = []
     for pet_kind, display_name, enabled in tracked:
         icon = "✅" if enabled else "❌"
-        rows.append([InlineKeyboardButton(
-            text=f"{icon}  {display_name}",
-            callback_data=f"toggle:ao_pet:{pet_kind}"
-        )])
+        rows.append([
+            InlineKeyboardButton(text=f"{icon}  {display_name}", callback_data=f"toggle:ao_pet:{pet_kind}"),
+            InlineKeyboardButton(text="🗑", callback_data=f"del:ao_pet:{pet_kind}"),
+        ])
     rows.append([InlineKeyboardButton(text="📊 Статистика фарма  ›", callback_data="customize:ao_pets_stats")])
     rows.append([InlineKeyboardButton(text="➕ Добавить пета",        callback_data="ao_pets_add")])
     rows.append([InlineKeyboardButton(text="🔙 Назад",                callback_data="customize:accountsops")])
@@ -185,10 +185,10 @@ def pets_customize_kb(tracked: list) -> InlineKeyboardMarkup:
     rows = []
     for name, enabled in tracked:
         icon = "✅" if enabled else "❌"
-        rows.append([InlineKeyboardButton(
-            text=f"{icon}  {name}",
-            callback_data=f"toggle:pet:{name}"
-        )])
+        rows.append([
+            InlineKeyboardButton(text=f"{icon}  {name}", callback_data=f"toggle:pet:{name}"),
+            InlineKeyboardButton(text="🗑", callback_data=f"del:pet:{name}"),
+        ])
     rows.append([InlineKeyboardButton(text="📊 Статистика фарма  ›", callback_data="customize:pets_stats")])
     rows.append([InlineKeyboardButton(text="➕ Добавить пета",        callback_data="pets_add")])
     rows.append([InlineKeyboardButton(text="🔙 Назад",                callback_data="customize:farmsync")])
