@@ -155,6 +155,14 @@ def get_tracked_pets(user_id: int) -> list:
         ).fetchall()
         return [(row[0][len("pet:"):], bool(row[1])) for row in rows]
 
+def get_tracked_ao_accounts(user_id: int) -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT key, enabled FROM user_settings WHERE user_id = ? AND key LIKE 'ao_account:%' ORDER BY key",
+            (user_id,)
+        ).fetchall()
+        return [(row[0][len("ao_account:"):], bool(row[1])) for row in rows]
+
 def get_tracked_fs_accounts(user_id: int) -> list:
     with get_conn() as conn:
         rows = conn.execute(

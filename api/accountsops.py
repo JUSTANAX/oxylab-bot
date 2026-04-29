@@ -43,8 +43,16 @@ async def get_account_pets(api_key: str, account_id) -> tuple[bool, list, str]:
     ok, data, err = await _get(api_key, f"/api/trackstats/accounts/{account_id}/pets")
     return ok, data or [], err
 
-async def get_all_pets(api_key: str) -> tuple[bool, dict, str]:
-    """Aggregate pets across all accounts. Returns {pet_kind: {"quantity": N, "is_egg": bool}}"""
+def _ao_account_name(account: dict) -> str:
+    for field in ("username", "name", "player_name", "login", "roblox_username", "account_name"):
+        val = account.get(field)
+        if val:
+            return str(val)
+    return ""
+
+async def get_all_pets(api_key: str, pet_accounts: list | None = None) -> tuple[bool, dict, str]:
+    """Aggregate pets across all accounts. Returns {pet_kind: {"quantity": N, "is_egg": bool}}
+    pet_accounts: список ников для фильтра. None = все аккаунты."""
     ok, data, err = await _get(api_key, "/api/trackstats/accounts")
     if not ok:
         return False, {}, err
@@ -58,6 +66,9 @@ async def get_all_pets(api_key: str) -> tuple[bool, dict, str]:
 
     if not accounts:
         return True, {}, ""
+
+    if pet_accounts is not None:
+        accounts = [acc for acc in accounts if _ao_account_name(acc) in pet_accounts]
 
     sem = asyncio.Semaphore(10)
 

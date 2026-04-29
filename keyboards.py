@@ -95,11 +95,24 @@ def fs_resources_customize_kb(settings: dict) -> InlineKeyboardMarkup:
 
 def ao_customize_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👥 Аккаунты  ›", callback_data="customize:ao_accounts")],
-        [InlineKeyboardButton(text="🐾 Петы  ›",     callback_data="customize:ao_pets")],
-        [InlineKeyboardButton(text="💰 Ресурсы  ›",  callback_data="customize:ao_resources")],
-        [InlineKeyboardButton(text="🔙 Назад",        callback_data="customize")],
+        [InlineKeyboardButton(text="👥 Аккаунты  ›",    callback_data="customize:ao_accounts")],
+        [InlineKeyboardButton(text="🐾 Петы  ›",         callback_data="customize:ao_pets")],
+        [InlineKeyboardButton(text="🎯 Фильтр петов  ›", callback_data="customize:ao_pet_accounts")],
+        [InlineKeyboardButton(text="💰 Ресурсы  ›",      callback_data="customize:ao_resources")],
+        [InlineKeyboardButton(text="🔙 Назад",            callback_data="customize")],
     ])
+
+def ao_pet_accounts_kb(tracked: list) -> InlineKeyboardMarkup:
+    rows = []
+    for username, enabled in tracked:
+        icon = "✅" if enabled else "❌"
+        rows.append([InlineKeyboardButton(
+            text=f"{icon}  {username}",
+            callback_data=f"toggle:ao_account:{username}"
+        )])
+    rows.append([InlineKeyboardButton(text="➕ Добавить аккаунт", callback_data="ao_accounts_add")])
+    rows.append([InlineKeyboardButton(text="🔙 Назад", callback_data="customize:accountsops")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 def ao_pets_customize_kb(tracked: list) -> InlineKeyboardMarkup:
     rows = []

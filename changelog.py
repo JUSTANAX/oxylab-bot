@@ -1,5 +1,12 @@
 CHANGELOG = [
     {
+        "version": "1.6",
+        "date": "29.04.2026",
+        "changes": [
+            "Фильтр петов по аккаунту теперь и для AccountsOps",
+        ],
+    },
+    {
         "version": "1.5",
         "date": "29.04.2026",
         "changes": [
