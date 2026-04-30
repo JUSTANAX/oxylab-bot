@@ -583,8 +583,8 @@ async def fs_account_receive(message: Message, state: FSMContext):
     tracked = get_tracked_fs_accounts(user_id)
     note = "ℹ️ Уже был в фильтре" if already else f"✅ <b>{account_name}</b> добавлен"
     text = (
+        "⚙️ Кастомизация  ›  🌾 FarmSync  ›  🎯 <b>Фильтр петов</b>\n\n"
         f"{note}\n\n"
-        "🎯 <b>Фильтр петов</b>\n\n"
         "✅ — аккаунт включён в подсчёт петов.\n"
         "❌ — исключён. Если все выключены — считаются все:"
     )
@@ -657,8 +657,8 @@ async def ao_account_receive(message: Message, state: FSMContext):
     tracked = get_tracked_ao_accounts(user_id)
     note = "ℹ️ Уже был в фильтре" if already else f"✅ <b>{account_name}</b> добавлен"
     text = (
+        "⚙️ Кастомизация  ›  👤 AccountsOps  ›  🎯 <b>Фильтр петов</b>\n\n"
         f"{note}\n\n"
-        "🎯 <b>Фильтр петов</b>\n\n"
         "✅ — аккаунт включён в подсчёт петов.\n"
         "❌ — исключён. Если все выключены — считаются все:"
     )
@@ -684,12 +684,15 @@ async def handle_ao_account_toggle(callback: CallbackQuery):
 @router.callback_query(lambda c: c.data == "pets_add")
 async def pets_add_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(SetKey.waiting_pet)
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     await callback.message.edit_text(
         "🐾 <b>Добавить пета</b>\n\n"
         "Введи название пета или яйца <b>точно как в игре</b>.\n\n"
         "<i>⚠️ Пет должен присутствовать в инвентаре хотя бы одного аккаунта.</i>",
         parse_mode="HTML",
-        reply_markup=cancel_kb()
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="customize:pets")]
+        ])
     )
     await callback.answer()
 
@@ -718,7 +721,7 @@ async def pets_add_receive(message: Message, state: FSMContext):
 
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     back_to_pets = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 К петам", callback_data="customize:pets")]
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="customize:pets")]
     ])
 
     if not matched:
@@ -752,12 +755,15 @@ async def pets_add_receive(message: Message, state: FSMContext):
 @router.callback_query(lambda c: c.data == "ao_pets_add")
 async def ao_pets_add_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(SetKey.waiting_ao_pet)
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     await callback.message.edit_text(
-        "🐾 <b>Добавить пета (AccountsOps)</b>\n\n"
+        "🐾 <b>Добавить пета</b>\n\n"
         "Введи название пета <b>точно как в игре</b>.\n\n"
         "<i>⚠️ Пет должен присутствовать в инвентаре хотя бы одного аккаунта.</i>",
         parse_mode="HTML",
-        reply_markup=cancel_kb()
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="customize:ao_pets")]
+        ])
     )
     await callback.answer()
 
@@ -789,7 +795,7 @@ async def ao_pets_add_receive(message: Message, state: FSMContext):
 
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     back_to_pets = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 К петам", callback_data="customize:ao_pets")]
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="customize:ao_pets")]
     ])
 
     if not matched_kind:
@@ -926,11 +932,16 @@ async def set_key(callback: CallbackQuery, state: FSMContext):
     await state.set_state(SetKey.waiting_key)
     await state.update_data(edit_panel=panel_type)
 
-    names = {"farmsync": "FarmSync", "accountsops": "AccountsOps"}
+    names  = {"farmsync": "FarmSync", "accountsops": "AccountsOps"}
+    emojis = {"farmsync": "🌾",       "accountsops": "👤"}
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     await callback.message.edit_text(
-        f"🔑 Отправь новый API ключ для <b>{names[panel_type]}</b>:",
+        f"🔧 Настройки  ›  🔑 API-Ключи  ›  {emojis[panel_type]} <b>{names[panel_type]}</b>\n\n"
+        "Отправь новый API ключ:",
         parse_mode="HTML",
-        reply_markup=cancel_kb()
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="api_keys")]
+        ])
     )
     await callback.answer()
 

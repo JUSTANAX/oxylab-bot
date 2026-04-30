@@ -157,9 +157,9 @@ def accounts_customize_kb(settings: dict) -> InlineKeyboardMarkup:
         return InlineKeyboardButton(text=f"{icon}  {label}", callback_data=f"toggle:{key}")
 
     return InlineKeyboardMarkup(inline_keyboard=[
-        [btn("accounts_active",   "✅ Активные")],
-        [btn("accounts_inactive", "💤 Неактивные")],
-        [btn("accounts_disabled", "⛔ Выключенные")],
+        [btn("accounts_active",   "Активные")],
+        [btn("accounts_inactive", "Неактивные")],
+        [btn("accounts_disabled", "Выключенные")],
         [InlineKeyboardButton(text="🔙 Назад", callback_data="customize:farmsync")],
     ])
 

@@ -45,8 +45,9 @@ async def alert_set_start(callback: CallbackQuery, state: FSMContext):
         alert_chat_id=callback.message.chat.id,
         alert_msg_id=callback.message.message_id,
     )
+    panel_emoji = {"farmsync": "🌾", "accountsops": "👤"}
     await callback.message.edit_text(
-        f"🔧 Настройки  ›  🔔 Уведомления  ›  <b>{names[panel]}</b>\n\n"
+        f"🔧 Настройки  ›  🔔 Уведомления  ›  {panel_emoji[panel]} <b>{names[panel]}</b>\n\n"
         "Введи пороговое значение активных аккаунтов.\n"
         "Пример: <code>100</code>",
         parse_mode="HTML",
@@ -86,8 +87,8 @@ async def alert_set_receive(message: Message, state: FSMContext):
     mode = user[0]
     thresholds = _get_thresholds(user_id, mode)
     await edit(
-        f"✅ Порог для <b>{names[panel]}</b> установлен: <b>< {threshold}</b>\n\n"
         "🔧 Настройки  ›  🔔 <b>Уведомления</b>\n\n"
+        f"✅ Порог для <b>{names[panel]}</b> установлен: <b>< {threshold}</b>\n\n"
         "Нажми на панель чтобы задать порог, на иконку — включить/выключить:",
         alerts_kb(mode, thresholds)
     )

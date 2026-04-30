@@ -42,7 +42,7 @@ async def admin_users(callback: CallbackQuery):
         await callback.answer("Нет пользователей", show_alert=True)
         return
 
-    lines = ["👥 <b>Пользователи</b>\n"]
+    lines = ["🛠 Админ  ›  👥 <b>Пользователи</b>\n"]
     for user_id, full_name, username, mode, created_at in rows:
         uname = f"@{username}" if username else "—"
         name  = full_name or "—"
