@@ -233,6 +233,11 @@ def back_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🔙 Назад", callback_data="back_stats")]
     ])
 
+def back_settings_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="settings_menu")]
+    ])
+
 def alerts_kb(mode: str, thresholds: dict) -> InlineKeyboardMarkup:
     rows = []
     if mode in ("farmsync", "both"):
@@ -259,7 +264,7 @@ def alerts_kb(mode: str, thresholds: dict) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text=label,  callback_data="alert_set:accountsops"),
             InlineKeyboardButton(text=icon,   callback_data="alert_toggle:accountsops"),
         ])
-    rows.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back_stats")])
+    rows.append([InlineKeyboardButton(text="🔙 Назад", callback_data="settings_menu")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 def alert_input_kb() -> InlineKeyboardMarkup:

@@ -6,7 +6,8 @@
       "Bash(git push *)",
       "Bash(git pull *)",
       "Bash(git *)",
-      "Bash(chmod +x *)"
+      "Bash(chmod +x *)",
+      "Bash(python -m py_compile handlers/start.py handlers/alerts.py handlers/admin.py keyboards.py bot.py)"
     ]
   }
 }

@@ -144,7 +144,28 @@ async def build_stats_text(user_id: int) -> str:
         get_all_pets(ao_panel[0], pet_accounts=ao_pet_filter) if need_ao_pets else noop(),
     )
 
-    lines = ["📊 <b>OxyLab</b>"]
+    status_parts = []
+    if mode in ("farmsync", "both") and get_setting(user_id, "panel_farmsync"):
+        if not fs_panel:
+            icon = "⚫"
+        elif need_fs and fs_res and fs_res[0]:
+            icon = "🟢"
+        else:
+            icon = "🔴"
+        status_parts.append(f"{icon} FarmSync")
+    if mode in ("accountsops", "both") and get_setting(user_id, "panel_accountsops"):
+        if not ao_panel:
+            icon = "⚫"
+        elif need_ao and ao_dash_res and ao_dash_res[0]:
+            icon = "🟢"
+        else:
+            icon = "🔴"
+        status_parts.append(f"{icon} AccountsOps")
+
+    header = "📊 <b>OxyLab</b>"
+    if status_parts:
+        header += "\n" + "   ".join(status_parts)
+    lines = [header]
 
     # ── FarmSync ──
     if mode in ("farmsync", "both") and get_setting(user_id, "panel_farmsync"):
@@ -373,7 +394,7 @@ async def open_customize(callback: CallbackQuery):
 @router.callback_query(lambda c: c.data == "customize:farmsync")
 async def open_customize_farmsync(callback: CallbackQuery):
     await callback.message.edit_text(
-        "🌾 <b>FarmSync</b>\n\nВыбери что отображать:",
+        "⚙️ Кастомизация  ›  🌾 <b>FarmSync</b>\n\nВыбери раздел:",
         parse_mode="HTML",
         reply_markup=farmsync_customize_kb(_get_settings(callback.from_user.id))
     )
@@ -382,8 +403,7 @@ async def open_customize_farmsync(callback: CallbackQuery):
 @router.callback_query(lambda c: c.data == "customize:accounts")
 async def open_customize_accounts(callback: CallbackQuery):
     await callback.message.edit_text(
-        "👥 <b>Аккаунты</b>\n\n"
-        "Выбери какую статистику показывать:",
+        "⚙️ Кастомизация  ›  🌾 FarmSync  ›  👥 <b>Аккаунты</b>\n\nВыбери какую статистику показывать:",
         parse_mode="HTML",
         reply_markup=accounts_customize_kb(_get_settings(callback.from_user.id))
     )
@@ -392,7 +412,7 @@ async def open_customize_accounts(callback: CallbackQuery):
 @router.callback_query(lambda c: c.data == "customize:fs_resources")
 async def open_customize_fs_resources(callback: CallbackQuery):
     await callback.message.edit_text(
-        "💰 <b>Ресурсы</b>\n\nВыбери что показывать:",
+        "⚙️ Кастомизация  ›  🌾 FarmSync  ›  💰 <b>Ресурсы</b>\n\nВыбери что показывать:",
         parse_mode="HTML",
         reply_markup=fs_resources_customize_kb(_get_settings(callback.from_user.id))
     )
@@ -401,7 +421,7 @@ async def open_customize_fs_resources(callback: CallbackQuery):
 @router.callback_query(lambda c: c.data == "customize:accountsops")
 async def open_customize_ao(callback: CallbackQuery):
     await callback.message.edit_text(
-        "👤 <b>AccountsOps</b>\n\nВыбери раздел:",
+        "⚙️ Кастомизация  ›  👤 <b>AccountsOps</b>\n\nВыбери раздел:",
         parse_mode="HTML",
         reply_markup=ao_customize_kb()
     )
@@ -410,7 +430,7 @@ async def open_customize_ao(callback: CallbackQuery):
 @router.callback_query(lambda c: c.data == "customize:ao_accounts")
 async def open_customize_ao_accounts(callback: CallbackQuery):
     await callback.message.edit_text(
-        "👥 <b>Аккаунты</b>\n\nВыбери какую статистику показывать:",
+        "⚙️ Кастомизация  ›  👤 AccountsOps  ›  👥 <b>Аккаунты</b>\n\nВыбери какую статистику показывать:",
         parse_mode="HTML",
         reply_markup=ao_accounts_customize_kb(_get_settings(callback.from_user.id))
     )
@@ -419,7 +439,7 @@ async def open_customize_ao_accounts(callback: CallbackQuery):
 @router.callback_query(lambda c: c.data == "customize:ao_resources")
 async def open_customize_ao_resources(callback: CallbackQuery):
     await callback.message.edit_text(
-        "💰 <b>Ресурсы</b>\n\nВыбери что показывать:",
+        "⚙️ Кастомизация  ›  👤 AccountsOps  ›  💰 <b>Ресурсы</b>\n\nВыбери что показывать:",
         parse_mode="HTML",
         reply_markup=ao_resources_customize_kb(_get_settings(callback.from_user.id))
     )
@@ -430,9 +450,7 @@ async def open_customize_ao_pets(callback: CallbackQuery):
     raw = get_tracked_ao_pets(callback.from_user.id)
     tracked = [(k, pet_kind_to_name(k), enabled) for k, enabled in raw]
     await callback.message.edit_text(
-        "🐾 <b>Петы</b>\n\n"
-        "Список отслеживаемых петов.\n"
-        "Нажми чтобы включить/выключить:",
+        "⚙️ Кастомизация  ›  👤 AccountsOps  ›  🐾 <b>Петы</b>\n\nСписок отслеживаемых петов.\nНажми чтобы включить/выключить:",
         parse_mode="HTML",
         reply_markup=ao_pets_customize_kb(tracked)
     )
@@ -441,8 +459,7 @@ async def open_customize_ao_pets(callback: CallbackQuery):
 @router.callback_query(lambda c: c.data == "customize:ao_pets_stats")
 async def open_customize_ao_pets_stats(callback: CallbackQuery):
     await callback.message.edit_text(
-        "📊 <b>Статистика фарма</b>\n\n"
-        "Выбери какие периоды показывать:",
+        "⚙️ Кастомизация  ›  👤 AccountsOps  ›  🐾 Петы  ›  📊 <b>Статистика</b>\n\nВыбери какие периоды показывать:",
         parse_mode="HTML",
         reply_markup=ao_pets_stats_customize_kb(_get_settings(callback.from_user.id))
     )
@@ -451,8 +468,7 @@ async def open_customize_ao_pets_stats(callback: CallbackQuery):
 @router.callback_query(lambda c: c.data == "customize:pets_stats")
 async def open_customize_pets_stats(callback: CallbackQuery):
     await callback.message.edit_text(
-        "📊 <b>Статистика фарма</b>\n\n"
-        "Выбери какие периоды показывать:",
+        "⚙️ Кастомизация  ›  🌾 FarmSync  ›  🐾 Петы  ›  📊 <b>Статистика</b>\n\nВыбери какие периоды показывать:",
         parse_mode="HTML",
         reply_markup=pets_stats_customize_kb(_get_settings(callback.from_user.id))
     )
@@ -462,9 +478,7 @@ async def open_customize_pets_stats(callback: CallbackQuery):
 async def open_customize_pets(callback: CallbackQuery):
     tracked = get_tracked_pets(callback.from_user.id)
     await callback.message.edit_text(
-        "🐾 <b>Петы</b>\n\n"
-        "Список отслеживаемых петов.\n"
-        "Нажми чтобы включить/выключить:",
+        "⚙️ Кастомизация  ›  🌾 FarmSync  ›  🐾 <b>Петы</b>\n\nСписок отслеживаемых петов.\nНажми чтобы включить/выключить:",
         parse_mode="HTML",
         reply_markup=pets_customize_kb(tracked)
     )
@@ -530,7 +544,7 @@ async def open_customize_fs_accounts(callback: CallbackQuery):
         "❌ — исключён. Если все выключены — считаются все:"
     )
     await callback.message.edit_text(
-        f"🎯 <b>Фильтр петов</b>\n\n{tip}",
+        f"⚙️ Кастомизация  ›  🌾 FarmSync  ›  🎯 <b>Фильтр петов</b>\n\n{tip}",
         parse_mode="HTML",
         reply_markup=fs_pet_accounts_kb(tracked)
     )
@@ -604,7 +618,7 @@ async def open_customize_ao_pet_accounts(callback: CallbackQuery):
         "❌ — исключён. Если все выключены — считаются все:"
     )
     await callback.message.edit_text(
-        f"🎯 <b>Фильтр петов</b>\n\n{tip}",
+        f"⚙️ Кастомизация  ›  👤 AccountsOps  ›  🎯 <b>Фильтр петов</b>\n\n{tip}",
         parse_mode="HTML",
         reply_markup=ao_pet_accounts_kb(tracked)
     )
@@ -899,7 +913,7 @@ async def api_keys_menu(callback: CallbackQuery):
     has_ao = get_panel(callback.from_user.id, "accountsops") is not None
 
     await callback.message.edit_text(
-        "🔑 <b>Управление API ключами</b>\n\n"
+        "🔧 Настройки  ›  🔑 <b>API-Ключи</b>\n\n"
         "Нажми на панель чтобы подключить или сменить ключ:",
         parse_mode="HTML",
         reply_markup=api_keys_kb(mode, has_fs, has_ao)
@@ -936,11 +950,12 @@ async def open_settings_menu(callback: CallbackQuery):
 @router.callback_query(lambda c: c.data == "changelog")
 async def show_changelog(callback: CallbackQuery):
     from changelog import build_changelog_text
-    await callback.message.edit_text(
-        build_changelog_text(),
-        parse_mode="HTML",
-        reply_markup=back_kb()
+    from keyboards import back_settings_kb
+    text = build_changelog_text().replace(
+        "📋 <b>Обновления</b>",
+        "🔧 Настройки  ›  📋 <b>Обновления</b>"
     )
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=back_settings_kb())
     await callback.answer()
 
 # ─── Валидация ────────────────────────────────────────────────────────────────
