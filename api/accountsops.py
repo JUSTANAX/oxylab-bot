@@ -1,5 +1,6 @@
 import re
 import asyncio
+import logging
 import aiohttp
 from config import ACCOUNTSOPS_URL
 
@@ -9,23 +10,24 @@ def pet_kind_to_name(pet_kind: str) -> str:
 
 async def _get(api_key: str, endpoint: str) -> tuple[bool, any, str]:
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    url = f"{ACCOUNTSOPS_URL}{endpoint}"
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{ACCOUNTSOPS_URL}{endpoint}",
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=10)
-            ) as resp:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                body = await resp.text()
+                logging.warning("[AO DEBUG] %s → %s | body: %s", endpoint, resp.status, body[:300])
                 if resp.status == 401:
                     return False, None, "Неверный API ключ."
                 if resp.status == 403:
                     return False, None, "Доступ запрещён."
                 if resp.status != 200:
                     return False, None, f"Ошибка сервера (код {resp.status})."
-                return True, await resp.json(), ""
+                import json
+                return True, json.loads(body), ""
     except aiohttp.ClientConnectorError:
         return False, None, "Не удалось подключиться к AccountsOps."
     except Exception as e:
+        logging.warning("[AO DEBUG] %s → exception: %s", endpoint, e)
         return False, None, f"Ошибка: {e}"
 
 async def get_dashboard(api_key: str) -> tuple[bool, dict, str]:
