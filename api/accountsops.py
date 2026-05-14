@@ -16,7 +16,7 @@ async def _get(api_key: str, endpoint: str) -> tuple[bool, any, str]:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 body = await resp.text()
-                await debug_notify.notify(f"<b>[AO DEBUG]</b> <code>{endpoint}</code>\nСтатус: <b>{resp.status}</b>\nОтвет: <code>{body[:300]}</code>")
+                logging.warning("[AO DEBUG] %s → %s | %s", endpoint, resp.status, body[:300])
                 if resp.status == 401:
                     return False, None, "Неверный API ключ."
                 if resp.status == 403:
@@ -26,10 +26,10 @@ async def _get(api_key: str, endpoint: str) -> tuple[bool, any, str]:
                 import json
                 return True, json.loads(body), ""
     except aiohttp.ClientConnectorError:
-        await debug_notify.notify(f"<b>[AO DEBUG]</b> <code>{endpoint}</code>\n❌ Не удалось подключиться")
+        logging.warning("[AO DEBUG] %s → connection error", endpoint)
         return False, None, "Не удалось подключиться к AccountsOps."
     except Exception as e:
-        await debug_notify.notify(f"<b>[AO DEBUG]</b> <code>{endpoint}</code>\n❌ Exception: <code>{e}</code>")
+        logging.warning("[AO DEBUG] %s → exception: %s", endpoint, e)
         return False, None, f"Ошибка: {e}"
 
 async def get_dashboard(api_key: str) -> tuple[bool, dict, str]:

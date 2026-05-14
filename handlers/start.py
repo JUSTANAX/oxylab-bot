@@ -4,9 +4,9 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 from keyboards import panel_choice_kb, stats_kb, settings_menu_kb, api_keys_kb, cancel_kb, back_kb, customize_kb, farmsync_customize_kb, accounts_customize_kb, pets_customize_kb, pets_stats_customize_kb, fs_resources_customize_kb, fs_pet_accounts_kb, ao_customize_kb, ao_accounts_customize_kb, ao_resources_customize_kb, ao_pets_customize_kb, ao_pets_stats_customize_kb, ao_pet_accounts_kb, PET_STAT_PERIODS, AO_PET_STAT_PERIODS, AO_STAT_ITEMS, AO_RESOURCE_ITEMS, FS_RESOURCE_ITEMS
-from database import get_user, get_user_profile, get_panel, save_panel, save_user, update_user_info, get_setting, toggle_setting, save_setting, setting_exists, delete_setting, get_tracked_pets, save_pet_snapshot, get_pets_farmed_detail, get_tracked_ao_pets, save_ao_pet_snapshot, get_ao_pets_farmed_detail, get_tracked_fs_accounts, get_tracked_ao_accounts, save_fs_resource_snapshot, get_fs_resource_diff, save_ao_resource_snapshot, get_ao_resource_diff
+from database import get_user, get_user_profile, get_panel, save_panel, save_user, update_user_info, get_setting, toggle_setting, save_setting, setting_exists, delete_setting, get_tracked_pets, save_pet_snapshot, get_pets_farmed_detail, get_tracked_ao_pets, save_ao_pet_snapshot, get_ao_pets_farmed_detail, get_tracked_fs_accounts, get_tracked_ao_accounts, save_fs_resource_snapshot, get_fs_resource_diff, save_ao_resource_snapshot, get_ao_resource_diff, get_rotation_tasks
 from api.farmsync import get_stats as fs_get_stats
 from api.accountsops import get_dashboard, get_trackstats, get_all_pets, pet_kind_to_name
 
@@ -165,6 +165,18 @@ async def build_stats_text(user_id: int) -> str:
     header = "📊 <b>OxyLab</b>"
     if status_parts:
         header += "\n" + "   ".join(status_parts)
+
+    import time as _time
+    rotation_tasks = [t for t in get_rotation_tasks(user_id) if t["enabled"] and t.get("next_run")]
+    if rotation_tasks:
+        nearest = min(rotation_tasks, key=lambda t: t["next_run"])
+        secs = nearest["next_run"] - int(_time.time())
+        if secs > 0:
+            h, rem = divmod(secs, 3600)
+            m = rem // 60
+            countdown = f"{h}ч {m}м" if h else f"{m}м"
+            header += f"\n🔁 Ротация через {countdown}"
+
     lines = [header]
 
     # ── FarmSync ──
@@ -348,24 +360,35 @@ async def build_stats_text(user_id: int) -> str:
 
 async def show_stats(message_or_obj, user_id: int, edit: bool = False):
     from config import ADMIN_ID
-    kb = stats_kb(is_admin=(user_id == ADMIN_ID))
+    user = get_user(user_id)
+    mode = user[0] if user else None
+    has_farmsync = mode in ("farmsync", "both") if mode else False
+    kb = stats_kb(is_admin=(user_id == ADMIN_ID), has_farmsync=has_farmsync)
     try:
         if edit and hasattr(message_or_obj, 'edit_text'):
             try:
                 await message_or_obj.edit_text("🔄 Загружаю...")
-            except TelegramBadRequest:
+            except (TelegramBadRequest, TelegramNetworkError):
                 pass
             text = await build_stats_text(user_id)
-            await message_or_obj.edit_text(text, parse_mode="HTML", reply_markup=kb)
+            try:
+                await message_or_obj.edit_text(text, parse_mode="HTML", reply_markup=kb)
+            except TelegramNetworkError:
+                await message_or_obj.answer(text, parse_mode="HTML", reply_markup=kb)
         else:
             msg = await message_or_obj.answer("🔄 Загружаю...")
             text = await build_stats_text(user_id)
-            await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
+            try:
+                await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
+            except TelegramNetworkError:
+                await message_or_obj.answer(text, parse_mode="HTML", reply_markup=kb)
     except TelegramBadRequest as e:
         if "message is not modified" in str(e):
             pass
         else:
             raise
+    except TelegramNetworkError:
+        pass
 
 # ─── Кастомизация ─────────────────────────────────────────────────────────────
 
@@ -966,7 +989,10 @@ async def show_changelog(callback: CallbackQuery):
         "📋 <b>Обновления</b>",
         "🔧 Настройки  ›  📋 <b>Обновления</b>"
     )
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=back_settings_kb())
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=back_settings_kb())
+    except TelegramNetworkError:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=back_settings_kb())
     await callback.answer()
 
 # ─── Валидация ────────────────────────────────────────────────────────────────
