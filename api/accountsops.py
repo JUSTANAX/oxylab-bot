@@ -74,16 +74,10 @@ async def get_all_pets(api_key: str, pet_accounts: list | None = None) -> tuple[
     if pet_accounts is not None:
         accounts = [acc for acc in accounts if _ao_account_name(acc) in pet_accounts]
 
-    sem = asyncio.Semaphore(10)
-
-    async def fetch(acc_id):
-        async with sem:
-            return await get_account_pets(api_key, acc_id)
-
-    results = await asyncio.gather(
-        *[fetch(acc["id"]) for acc in accounts if acc.get("id")],
-        return_exceptions=True,
-    )
+    results = []
+    for acc in accounts:
+        if acc.get("id"):
+            results.append(await get_account_pets(api_key, acc["id"]))
 
     pets: dict = {}
     for result in results:

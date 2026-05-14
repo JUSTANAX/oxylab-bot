@@ -137,12 +137,13 @@ async def build_stats_text(user_id: int) -> str:
     async def noop():
         return None
 
-    fs_res, ao_dash_res, ao_track_res, ao_pets_res = await asyncio.gather(
-        fs_get_stats(fs_panel[0], pet_accounts=pet_filter) if need_fs else noop(),
-        get_dashboard(ao_panel[0]) if need_ao else noop(),
-        get_trackstats(ao_panel[0]) if need_ao_track else noop(),
-        get_all_pets(ao_panel[0], pet_accounts=ao_pet_filter) if need_ao_pets else noop(),
-    )
+    # FarmSync запускаем параллельно, AccountsOps — строго последовательно
+    # (их API банит за concurrent запросы с одного ключа)
+    fs_res = await fs_get_stats(fs_panel[0], pet_accounts=pet_filter) if need_fs else None
+
+    ao_dash_res = await get_dashboard(ao_panel[0]) if need_ao else None
+    ao_track_res = await get_trackstats(ao_panel[0]) if need_ao_track else None
+    ao_pets_res = await get_all_pets(ao_panel[0], pet_accounts=ao_pet_filter) if need_ao_pets else None
 
     status_parts = []
     if mode in ("farmsync", "both") and get_setting(user_id, "panel_farmsync"):
