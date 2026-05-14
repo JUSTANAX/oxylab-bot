@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from config import DB_PATH
 
 def get_conn():
-    return sqlite3.connect(DB_PATH)
+    return sqlite3.connect(DB_PATH, isolation_level=None)
 
 def init_db():
     with get_conn() as conn:
