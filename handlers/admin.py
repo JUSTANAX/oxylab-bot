@@ -63,9 +63,15 @@ async def cmd_setaokey(message: Message):
         await message.answer("Использование: <code>/setaokey &lt;api_key&gt;</code>", parse_mode="HTML")
         return
     api_key = parts[1].strip()
-    from database import save_panel
-    save_panel(message.from_user.id, "accountsops", api_key)
-    await message.answer(f"✅ Ключ AccountsOps сохранён\n<code>{api_key[:6]}...{api_key[-4:]}</code> ({len(api_key)} симв.)", parse_mode="HTML")
+    user_id = message.from_user.id
+    from database import save_panel, get_panel
+    save_panel(user_id, "accountsops", api_key)
+    saved = get_panel(user_id, "accountsops")
+    saved_key = saved[0] if saved else None
+    if saved_key == api_key:
+        await message.answer(f"✅ Сохранено и подтверждено\n<code>{api_key[:6]}...{api_key[-4:]}</code>", parse_mode="HTML")
+    else:
+        await message.answer(f"❌ Не совпадает!\nОтправлено: <code>{api_key[:6]}...{api_key[-4:]}</code>\nВ БД: <code>{saved_key[:6] if saved_key else 'нет'}...{saved_key[-4:] if saved_key else ''}</code>", parse_mode="HTML")
 
 # ─── /debugao ─────────────────────────────────────────────────────────────────
 
