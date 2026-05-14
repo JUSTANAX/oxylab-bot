@@ -54,6 +54,19 @@ async def admin_users(callback: CallbackQuery):
     await callback.message.edit_text("\n".join(lines), parse_mode="HTML", reply_markup=kb)
     await callback.answer()
 
+# ─── /setaokey ────────────────────────────────────────────────────────────────
+
+@router.message(Command("setaokey"), F.from_user.id == ADMIN_ID)
+async def cmd_setaokey(message: Message):
+    parts = message.text.strip().split(maxsplit=1)
+    if len(parts) < 2:
+        await message.answer("Использование: <code>/setaokey &lt;api_key&gt;</code>", parse_mode="HTML")
+        return
+    api_key = parts[1].strip()
+    from database import save_panel
+    save_panel(message.from_user.id, "accountsops", api_key)
+    await message.answer(f"✅ Ключ AccountsOps сохранён\n<code>{api_key[:6]}...{api_key[-4:]}</code> ({len(api_key)} симв.)", parse_mode="HTML")
+
 # ─── /debugao ─────────────────────────────────────────────────────────────────
 
 @router.message(Command("debugao"), F.from_user.id == ADMIN_ID)

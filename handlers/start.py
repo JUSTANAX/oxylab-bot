@@ -71,6 +71,15 @@ async def receive_key(message: Message, state: FSMContext):
     setup_mode = data.get("setup_mode")
     user_id = message.from_user.id
 
+    if not panel_type:
+        await state.clear()
+        await message.answer(
+            "⚠️ Сессия устарела (бот перезапустился).\n\n"
+            "Открой <b>Настройки → 🔑 API-Ключи</b> и попробуй снова.",
+            parse_mode="HTML"
+        )
+        return
+
     msg = await message.answer("🔄 Проверяю ключ...")
     ok, error = await validate_key(panel_type, api_key)
 
