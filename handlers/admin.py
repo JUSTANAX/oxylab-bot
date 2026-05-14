@@ -71,8 +71,11 @@ async def cmd_setaokey(message: Message):
 
 @router.message(Command("debugao"), F.from_user.id == ADMIN_ID)
 async def cmd_debugao(message: Message):
+    import os
     from api.accountsops import _get
-    await message.answer("🔖 Версия кода: <b>v2.3</b>", parse_mode="HTML")
+    from config import DB_PATH
+    db_abs = os.path.abspath(DB_PATH)
+    await message.answer(f"🔖 Версия кода: <b>v2.3</b>\n📁 БД: <code>{db_abs}</code>", parse_mode="HTML")
     panel = get_panel(message.from_user.id, "accountsops")
     if not panel:
         await message.answer("❌ AccountsOps не подключён в базе")
