@@ -6,7 +6,8 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ErrorEvent
 from aiogram.exceptions import TelegramBadRequest
-from config import BOT_TOKEN
+from config import BOT_TOKEN, ADMIN_ID
+import debug_notify
 from database import (
     init_db, get_users_with_alerts, update_alert_notified,
     get_panel as db_get_panel,
@@ -142,6 +143,7 @@ async def alert_checker_loop(bot: Bot):
 async def main():
     init_db()
     bot = Bot(token=BOT_TOKEN)
+    debug_notify.setup(bot, ADMIN_ID)
     dp = Dispatcher(storage=MemoryStorage())
 
     @dp.error()
