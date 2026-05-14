@@ -59,6 +59,7 @@ async def admin_users(callback: CallbackQuery):
 @router.message(Command("debugao"), F.from_user.id == ADMIN_ID)
 async def cmd_debugao(message: Message):
     from api.accountsops import _get
+    await message.answer("🔖 Версия кода: <b>v2.3</b>", parse_mode="HTML")
     panel = get_panel(message.from_user.id, "accountsops")
     if not panel:
         await message.answer("❌ AccountsOps не подключён в базе")
