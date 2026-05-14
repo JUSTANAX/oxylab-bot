@@ -4,7 +4,7 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from config import ADMIN_ID
-from database import get_admin_stats, get_all_users
+from database import get_admin_stats, get_all_users, get_panel
 from keyboards import admin_kb
 
 router = Router()
@@ -53,6 +53,23 @@ async def admin_users(callback: CallbackQuery):
     ])
     await callback.message.edit_text("\n".join(lines), parse_mode="HTML", reply_markup=kb)
     await callback.answer()
+
+# ─── /debugao ─────────────────────────────────────────────────────────────────
+
+@router.message(Command("debugao"), F.from_user.id == ADMIN_ID)
+async def cmd_debugao(message: Message):
+    from api.accountsops import _get
+    panel = get_panel(message.from_user.id, "accountsops")
+    if not panel:
+        await message.answer("❌ AccountsOps не подключён в базе")
+        return
+    api_key = panel[0]
+    await message.answer(f"🔑 Ключ в БД: <code>{api_key[:6]}...{api_key[-4:]}</code> ({len(api_key)} симв.)", parse_mode="HTML")
+    ok, data, err = await _get(api_key, "/api/dashboard")
+    if ok:
+        await message.answer(f"✅ /api/dashboard OK\n<code>{str(data)[:500]}</code>", parse_mode="HTML")
+    else:
+        await message.answer(f"❌ /api/dashboard FAIL\n{err}", parse_mode="HTML")
 
 # ─── /restart ─────────────────────────────────────────────────────────────────
 
