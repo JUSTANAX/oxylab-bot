@@ -3,26 +3,40 @@ import asyncio
 import aiohttp
 from config import FARMSYNC_URL
 
-async def _get(api_key: str, endpoint: str) -> tuple[bool, any, str]:
+async def _request(method: str, api_key: str, endpoint: str, body: dict | None = None) -> tuple[bool, any, str]:
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{FARMSYNC_URL}{endpoint}",
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=10)
-            ) as resp:
+            func = getattr(session, method)
+            kwargs = {"headers": headers, "timeout": aiohttp.ClientTimeout(total=30)}
+            if body is not None:
+                kwargs["json"] = body
+            async with func(f"{FARMSYNC_URL}{endpoint}", **kwargs) as resp:
                 if resp.status == 401:
                     return False, None, "Неверный API ключ."
                 if resp.status == 403:
                     return False, None, "Доступ запрещён."
-                if resp.status != 200:
+                if resp.status not in (200, 201):
                     return False, None, f"Ошибка сервера (код {resp.status})."
                 return True, await resp.json(), ""
     except aiohttp.ClientConnectorError:
         return False, None, "Не удалось подключиться к FarmSync."
     except Exception as e:
         return False, None, f"Ошибка: {e}"
+
+async def _get(api_key: str, endpoint: str) -> tuple[bool, any, str]:
+    return await _request("get", api_key, endpoint)
+
+async def get_folder_groups(api_key: str) -> tuple[bool, list, str]:
+    ok, data, err = await _get(api_key, "/api/self/folder-groups")
+    return ok, data or [], err
+
+async def get_configs(api_key: str) -> tuple[bool, list, str]:
+    ok, data, err = await _get(api_key, "/api/self/configs")
+    return ok, data or [], err
+
+async def bulk_update_accounts(api_key: str, accounts: list) -> tuple[bool, any, str]:
+    return await _request("put", api_key, "/api/self/accounts/bulk", {"accounts": accounts})
 
 async def get_devices(api_key: str) -> tuple[bool, list, str]:
     ok, data, err = await _get(api_key, "/api/devices/")

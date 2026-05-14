@@ -72,6 +72,31 @@ def init_db():
                 last_notified TEXT,
                 PRIMARY KEY (user_id, panel)
             );
+
+            CREATE TABLE IF NOT EXISTS rotation_tasks (
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id              INTEGER NOT NULL,
+                folder_a_id          TEXT NOT NULL,
+                folder_a_name        TEXT NOT NULL DEFAULT '',
+                folder_b_id          TEXT NOT NULL,
+                folder_b_name        TEXT NOT NULL DEFAULT '',
+                farming_config       TEXT NOT NULL,
+                farming_config_name  TEXT NOT NULL DEFAULT '',
+                standing_config      TEXT NOT NULL,
+                standing_config_name TEXT NOT NULL DEFAULT '',
+                interval_hours       INTEGER NOT NULL DEFAULT 12,
+                next_run             INTEGER,
+                enabled              INTEGER NOT NULL DEFAULT 1,
+                state                TEXT NOT NULL DEFAULT 'a_farming'
+            );
+
+            CREATE TABLE IF NOT EXISTS rotation_log (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id  INTEGER NOT NULL,
+                run_at   TEXT NOT NULL,
+                switched INTEGER DEFAULT 0,
+                skipped  TEXT DEFAULT '[]'
+            );
         """)
         for col in ("username TEXT", "full_name TEXT", "subscription TEXT DEFAULT 'Test'"):
             try:
@@ -367,6 +392,105 @@ def get_ao_resource_diff(user_id: int, cur_bucks: int, cur_potions: int, hours: 
     if not row:
         return None, None
     return max(0, cur_bucks - row[0]), max(0, cur_potions - row[1])
+
+# ─── Автопилот: ротация ───────────────────────────────────────────────────────
+
+_ROTATION_COLS = [
+    'id','user_id',
+    'folder_a_id','folder_a_name','folder_b_id','folder_b_name',
+    'farming_config','farming_config_name','standing_config','standing_config_name',
+    'interval_hours','next_run','enabled','state',
+]
+
+def _rotation_row(row) -> dict:
+    return dict(zip(_ROTATION_COLS, row))
+
+def create_rotation_task(
+    user_id: int,
+    folder_a_id: str, folder_a_name: str,
+    folder_b_id: str, folder_b_name: str,
+    farming_config: str, farming_config_name: str,
+    standing_config: str, standing_config_name: str,
+    interval_hours: int,
+) -> int:
+    import time as _time
+    next_run = int(_time.time()) + interval_hours * 3600
+    with get_conn() as conn:
+        cur = conn.execute(
+            """INSERT INTO rotation_tasks
+               (user_id, folder_a_id, folder_a_name, folder_b_id, folder_b_name,
+                farming_config, farming_config_name, standing_config, standing_config_name,
+                interval_hours, next_run)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            (user_id, folder_a_id, folder_a_name, folder_b_id, folder_b_name,
+             farming_config, farming_config_name, standing_config, standing_config_name,
+             interval_hours, next_run),
+        )
+        return cur.lastrowid
+
+def get_rotation_tasks(user_id: int) -> list:
+    with get_conn() as conn:
+        rows = conn.execute(
+            f"SELECT {','.join(_ROTATION_COLS)} FROM rotation_tasks WHERE user_id = ? ORDER BY id",
+            (user_id,),
+        ).fetchall()
+        return [_rotation_row(r) for r in rows]
+
+def get_rotation_task(task_id: int) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            f"SELECT {','.join(_ROTATION_COLS)} FROM rotation_tasks WHERE id = ?",
+            (task_id,),
+        ).fetchone()
+        return _rotation_row(row) if row else None
+
+def delete_rotation_task(task_id: int):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM rotation_tasks WHERE id = ?", (task_id,))
+        conn.execute("DELETE FROM rotation_log WHERE task_id = ?", (task_id,))
+
+def toggle_rotation_task(task_id: int) -> bool:
+    with get_conn() as conn:
+        row = conn.execute("SELECT enabled FROM rotation_tasks WHERE id = ?", (task_id,)).fetchone()
+        new_val = 0 if (row and row[0]) else 1
+        conn.execute("UPDATE rotation_tasks SET enabled = ? WHERE id = ?", (new_val, task_id))
+        return bool(new_val)
+
+def get_due_rotation_tasks() -> list:
+    import time as _time
+    now = int(_time.time())
+    with get_conn() as conn:
+        rows = conn.execute(
+            f"SELECT {','.join(_ROTATION_COLS)} FROM rotation_tasks "
+            "WHERE enabled = 1 AND next_run IS NOT NULL AND next_run <= ?",
+            (now,),
+        ).fetchall()
+        return [_rotation_row(r) for r in rows]
+
+def advance_rotation_next_run(task_id: int, interval_hours: int):
+    import time as _time
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE rotation_tasks SET next_run = ? WHERE id = ?",
+            (int(_time.time()) + interval_hours * 3600, task_id),
+        )
+
+def complete_rotation(task_id: int, new_state: str, switched: int, skipped: list):
+    import json
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    with get_conn() as conn:
+        conn.execute("UPDATE rotation_tasks SET state = ? WHERE id = ?", (new_state, task_id))
+        conn.execute(
+            "INSERT INTO rotation_log (task_id, run_at, switched, skipped) VALUES (?,?,?,?)",
+            (task_id, now, switched, json.dumps(skipped, ensure_ascii=False)),
+        )
+
+def get_rotation_logs(task_id: int, limit: int = 3) -> list:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT run_at, switched, skipped FROM rotation_log WHERE task_id = ? ORDER BY id DESC LIMIT ?",
+            (task_id, limit),
+        ).fetchall()
 
 def update_alert_notified(user_id: int, panel: str):
     with get_conn() as conn:

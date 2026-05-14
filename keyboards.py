@@ -7,13 +7,15 @@ def panel_choice_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="⚡ Оба варианта", callback_data="mode:both")],
     ])
 
-def stats_kb(is_admin: bool = False) -> InlineKeyboardMarkup:
+def stats_kb(is_admin: bool = False, has_farmsync: bool = False) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(text="🔄 Обновить",     callback_data="refresh_stats")],
         [InlineKeyboardButton(text="👤 Профиль",       callback_data="profile"),
          InlineKeyboardButton(text="⚙️ Кастомизация", callback_data="customize")],
         [InlineKeyboardButton(text="🔧 Настройки",    callback_data="settings_menu")],
     ]
+    if has_farmsync:
+        rows.append([InlineKeyboardButton(text="🤖 Автопилот", callback_data="autopilot")])
     if is_admin:
         rows.append([InlineKeyboardButton(text="🛠 Админ", callback_data="admin_panel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
