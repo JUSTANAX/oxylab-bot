@@ -118,6 +118,28 @@ def init_db():
                 )
             """)
 
+        # Мигрируем panels если старая схема (есть autoincrement id — нет composite PK)
+        try:
+            conn.execute("SELECT id FROM panels LIMIT 1")
+            # Старая схема обнаружена — пересоздаём с правильным PK
+            conn.execute("""
+                CREATE TABLE panels_new (
+                    user_id  INTEGER,
+                    type     TEXT,
+                    api_key  TEXT,
+                    PRIMARY KEY (user_id, type)
+                )
+            """)
+            conn.execute("""
+                INSERT INTO panels_new (user_id, type, api_key)
+                SELECT user_id, type, api_key FROM panels
+                WHERE id IN (SELECT MAX(id) FROM panels GROUP BY user_id, type)
+            """)
+            conn.execute("DROP TABLE panels")
+            conn.execute("ALTER TABLE panels_new RENAME TO panels")
+        except Exception:
+            pass
+
 def get_user(user_id: int):
     with get_conn() as conn:
         return conn.execute(
