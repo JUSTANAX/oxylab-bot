@@ -945,7 +945,8 @@ async def back_stats(callback: CallbackQuery, state: FSMContext):
     await show_stats(callback.message, callback.from_user.id, edit=True)
 
 @router.callback_query(lambda c: c.data == "api_keys")
-async def api_keys_menu(callback: CallbackQuery):
+async def api_keys_menu(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     user = get_user(callback.from_user.id)
     mode = user[0]
     has_fs = get_panel(callback.from_user.id, "farmsync") is not None
@@ -963,7 +964,7 @@ async def api_keys_menu(callback: CallbackQuery):
 async def set_key(callback: CallbackQuery, state: FSMContext):
     panel_type = callback.data.split(":")[1]
     await state.set_state(SetKey.waiting_key)
-    await state.update_data(edit_panel=panel_type)
+    await state.set_data({"edit_panel": panel_type})
 
     names  = {"farmsync": "FarmSync", "accountsops": "AccountsOps"}
     emojis = {"farmsync": "🌾",       "accountsops": "👤"}
