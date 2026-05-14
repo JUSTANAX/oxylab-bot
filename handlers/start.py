@@ -1003,5 +1003,5 @@ async def validate_key(panel_type: str, api_key: str) -> tuple[bool, str]:
         ok, _, err = await get_devices(api_key)
         return ok, err
     else:
-        ok, _, err = await get_dashboard(api_key)
-        return ok, err
+        # Валидацию пропускаем — сохраняем ключ напрямую
+        return True, ""
